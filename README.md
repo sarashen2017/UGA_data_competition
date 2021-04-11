@@ -8,3 +8,4 @@ The dataset was simulated by Wells Fargo, including training, validation and tes
 Notebook description:
 
 model_selection.ipynb : feedforward neural network (MLP) & simple gradient boosting 
+logistic_regrssion_FAMD_reduction.ipynb: logistic regression with FAMD reduction baseline model
