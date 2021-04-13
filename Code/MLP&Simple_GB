@@ -1,0 +1,742 @@
+# Read Dataset --KNN
+
+import pandas as pd
+df1=pd.read_csv('KNN_impute.csv')
+df1_vali=pd.read_csv('KNN_impute_validation.csv')
+df1_test=pd.read_csv('KNN_impute_test.csv')
+
+# MLP-- upsampling KNN
+
+
+def upsample(data):
+    from sklearn.utils import resample
+    
+    df_majority=data[data.Default_ind==0]
+    df_minority=data[data.Default_ind==1]
+    largenumber=len(df_majority)
+    df_minority_upsampled=resample(df_minority,replace=True,n_samples=int(1.2*largenumber),random_state=123)
+    df_upsampled=pd.concat([pd.DataFrame(df_majority),pd.DataFrame(df_minority_upsampled)])
+    return df_upsampled
+
+df1_up= upsample(df1)
+df1_vali_up=upsample(df1_vali)
+
+def Cate_to_object_excp_inq(dataset):
+    return(dataset.astype({'non_mtg_acc_past_due_12_months_num': 'object','non_mtg_acc_past_due_6_months_num': 'object','mortgages_past_due_6_months_num': 'object','card_inq_24_month_num': 'float64','inq_12_month_num': 'float64','card_open_36_month_num': 'object','auto_open_36_month_num': 'object','ind_acc_XYZ': 'object'}))
+
+df1_up=Cate_to_object_excp_inq(df1_up)
+df1_vali=Cate_to_object_excp_inq(df1_vali)
+
+def para_tune(datatrain, datavali, criteria='accuracy', randomstate=0):
+    ## X is the validation set variables
+    ## Y is the validation set response
+    from sklearn.model_selection import PredefinedSplit
+    import numpy as np
+    frames=pd.concat([datatrain, datavali])
+    frames_reind=frames.set_index([pd.Index(range(len(frames)))])
+    split_index=[-1]*len(datatrain)+[0]*len(datavali)
+    pds = PredefinedSplit(test_fold = split_index)
+    datadummy=pd.get_dummies(frames_reind)
+    datatrainX=np.array(datadummy.drop('Default_ind', axis=1))
+    datatrainy=datadummy['Default_ind']
+    parameter_space = {
+        'hidden_layer_sizes': [(50,50,50), (50,100,50), (100,)],
+        'activation': ['tanh', 'relu'],
+        'solver': ['lbfgs', 'adam'],
+        'alpha': [0.0001, 0.05],
+        'learning_rate': ['constant','adaptive'],
+    }
+    from sklearn.model_selection import GridSearchCV
+    from sklearn.neural_network import MLPClassifier
+    mlp = MLPClassifier(max_iter=1000)
+    clf = GridSearchCV(mlp, parameter_space, n_jobs=-1, cv=pds,scoring=criteria)
+    clf.fit(datatrainX, datatrainy)
+    return clf,datatrainX,datatrainy
+
+clf1,x1,y1=para_tune(df1_up,df1_vali_up)
+
+clf1.best_params_
+
+from sklearn.neural_network import MLPClassifier
+mlp = MLPClassifier(activation='relu',alpha=0.001,hidden_layer_sizes=(50,100,50),learning_rate='adaptive',
+                        solver='adam',max_iter=1000)
+
+mlp.fit(x1,y1)
+
+df1_test1=Cate_to_object_excp_inq(df1_test)
+df1_test1=pd.get_dummies(df1_test1)
+mlp.score(df1_test1.drop('Default_ind',axis=1),df1_test1['Default_ind'])
+
+y_pred1=mlp.predict(df1_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix( df1_test1['Default_ind'],y_pred1)
+
+
+# Read Dataset --Unconditional median
+
+import pandas as pd
+df2=pd.read_csv('Unconditional_median_impute.csv')
+df2_vali=pd.read_csv('Unconditional_median_impute_validation.csv')
+df2_test=pd.read_csv('Unconditional_median_impute_test.csv')
+
+# MLP-- Unconditional median
+
+df2_up= upsample(df2)
+df2_vali_up=upsample(df2_vali)
+
+df2_up=Cate_to_object_excp_inq(df2_up)
+df2_vali=Cate_to_object_excp_inq(df2_vali_up)
+
+clf2,x2,y2=para_tune(df2_up,df2_vali_up)
+
+clf2.best_params_
+
+df2_test1=Cate_to_object_excp_inq(df2_test)
+df2_test1=pd.get_dummies(df2_test1)
+clf2.score(df2_test1.drop('Default_ind',axis=1),df2_test1['Default_ind'])
+
+from sklearn.neural_network import MLPClassifier
+mlp1 = MLPClassifier(activation='relu',alpha=0.05,hidden_layer_sizes=(50,50,50),learning_rate='constant',
+                        solver='adam',max_iter=1000)
+mlp1.fit(x2,y2)
+mlp1.score(df2_test1.drop('Default_ind',axis=1),df2_test1['Default_ind'])
+
+y_pred2=mlp1.predict(df2_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix( df2_test1['Default_ind'],y_pred2)
+
+
+# Read Dataset -- drop
+
+import pandas as pd
+df3=pd.read_csv('Listwise_deletion.csv')
+df3_vali=pd.read_csv('Listwise_deletion_validation.csv')
+df3_test=pd.read_csv('Listwise_deletion_test.csv')
+
+# MLP -- drop
+
+df3_up= upsample(df3)
+df3_vali_up=upsample(df3_vali)
+
+df3_up=Cate_to_object_excp_inq(df3_up)
+df3_vali=Cate_to_object_excp_inq(df3_vali)
+
+clf3,x3,y3=para_tune(df3_up,df3_vali_up)
+
+df3_test1=Cate_to_object_excp_inq(df3_test)
+df3_test1=pd.get_dummies(df3_test1)
+clf3.score(df3_test1.drop('Default_ind',axis=1),df3_test1['Default_ind'])
+
+clf3.best_params_
+
+from sklearn.neural_network import MLPClassifier
+mlp2 = MLPClassifier(activation='relu',alpha=0.001,hidden_layer_sizes=(50,50,50),learning_rate='constant',
+                        solver='adam',max_iter=1000)
+mlp2.fit(x3,y3)
+mlp2.score(df3_test1.drop('Default_ind',axis=1),df3_test1['Default_ind'])
+
+y_pred3=mlp2.predict(df3_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(df3_test1['Default_ind'],y_pred3)
+
+# Read Dataset -- EM
+
+import pandas as pd
+df4=pd.read_csv('Simulated_Data_Train_em.csv')
+df4_vali=pd.read_csv('Simulated_Data_validatiion_em.csv')
+df4_test=pd.read_csv('Simulated_Data_test_em.csv')
+
+
+pd.get_dummies(pd.concat([df4, df4_vali]))
+
+# MLP -- EM
+
+df4_up= upsample(df4)
+df4_vali_up=upsample(df4_vali)
+
+df4_up=Cate_to_object_excp_inq(df4_up)
+df4_vali_up=Cate_to_object_excp_inq(df4_vali_up)
+
+df4_up.head()
+
+clf4,x4,y4=para_tune(df4_up,df4_vali_up)
+
+df4_test1=Cate_to_object_excp_inq(df4_test)
+df4_test1=pd.get_dummies(df4_test1)
+
+clf4.best_params_
+
+pd.DataFrame(x4).head()
+
+from sklearn.neural_network import MLPClassifier
+mlp3 = MLPClassifier(activation='tanh',alpha=0.0001,hidden_layer_sizes=(50,50,50),learning_rate='constant',
+                        solver='adam',max_iter=1000)
+mlp3.fit(x4,y4)
+mlp3.score(df4_test1.drop('Default_ind',axis=1),df4_test1['Default_ind'])
+
+y_pred4=mlp3.predict(df4_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(df4_test1['Default_ind'],y_pred4)
+
+# Read Dataset -- CART
+
+import pandas as pd
+df5=pd.read_csv('cart_impute.csv')
+df5_vali=pd.read_csv('cart_impute_vali.csv')
+df5_test=pd.read_csv('cart_impute_Test.csv')
+
+
+# MLP--cart
+
+df5_up= upsample(df5)
+df5_vali_up=upsample(df5_vali)
+
+df5_up=Cate_to_object_excp_inq(df5_up)
+df5_vali=Cate_to_object_excp_inq(df5_vali)
+
+clf5,x5,y5=para_tune(df5_up,df5_vali_up)
+
+clf5.best_params_
+
+df5_test1=Cate_to_object_excp_inq(df5_test)
+df5_test1=pd.get_dummies(df5_test1)
+
+from sklearn.neural_network import MLPClassifier
+mlp4 = MLPClassifier(activation='relu',alpha=0.0001,hidden_layer_sizes=(100,),learning_rate='adaptive',
+                        solver='adam',max_iter=1000)
+mlp4.fit(x5,y5)
+mlp4.score(df5_test1.drop('Default_ind',axis=1),df5_test1['Default_ind'])
+
+y_pred5=mlp4.predict(df5_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(df5_test1['Default_ind'],y_pred5)
+
+# Read data --RF 
+
+import pandas as pd
+df6=pd.read_csv('rf.csv')
+df6_vali=pd.read_csv('rf_Vali.csv')
+df6_test=pd.read_csv('rf_Test.csv')
+
+
+# MLP--RF
+
+df6_up= upsample(df6)
+df6_vali_up=upsample(df6_vali)
+df6_up=Cate_to_object_excp_inq(df6_up)
+df6_vali=Cate_to_object_excp_inq(df6_vali)
+
+clf6,x6,y6=para_tune(df6_up,df6_vali_up)
+
+clf6.best_params_
+
+df6_test1=Cate_to_object_excp_inq(df6_test)
+df6_test1=pd.get_dummies(df6_test1)
+clf6.score(df6_test1.drop('Default_ind',axis=1),df6_test1['Default_ind'])
+
+from sklearn.neural_network import MLPClassifier
+mlp5= MLPClassifier(activation='relu',alpha=0.0001,hidden_layer_sizes=(50,100,50),learning_rate='constant',
+                        solver='adam',max_iter=1000)
+mlp5.fit(x6,y6)
+mlp5.score(df6_test1.drop('Default_ind',axis=1),df6_test1['Default_ind'])
+
+y_pred6=mlp5.predict(df6_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(df6_test1['Default_ind'],y_pred6)
+
+# Read data --EMB 
+
+import pandas as pd
+df7=pd.read_csv('EMB_impute.csv')
+df7_vali=pd.read_csv('EMB_impute_Vali.csv')
+df7_test=pd.read_csv('EMB_impute_Test.csv')
+
+
+
+# MLP--EMB
+
+df7_up= upsample(df7)
+df7_vali_up=upsample(df7_vali)
+df7_up=Cate_to_object_excp_inq(df7_up)
+df7_vali=Cate_to_object_excp_inq(df7_vali)
+
+clf7,x7,y7=para_tune(df7_up,df7_vali_up)
+
+clf7.best_params_
+
+df7_test1=Cate_to_object_excp_inq(df7_test)
+df7_test1=pd.get_dummies(df7_test1)
+clf7.score(df7_test1.drop('Default_ind',axis=1),df7_test1['Default_ind'])
+
+from sklearn.neural_network import MLPClassifier
+mlp6 = MLPClassifier(activation='relu',alpha=0.05,hidden_layer_sizes=(50,100,50),learning_rate='constant',
+                        solver='adam',max_iter=1000)
+mlp6.fit(x7,y7)
+mlp6.score(df7_test1.drop('Default_ind',axis=1),df7_test1['Default_ind'])
+
+y_pred7=mlp6.predict(df7_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(df7_test1['Default_ind'],y_pred7)
+
+# Read data-- unconditional mean
+
+import pandas as pd
+dfn=pd.read_csv('Unconditional_mean_impute_Test.csv')
+dfn_vali=pd.read_csv('Unconditional_mean_impute_Validation.csv')
+dfn_test=pd.read_csv('Unconditional_mean_impute_Test.csv')
+
+
+
+dfn_up= upsample(dfn)
+dfn_vali_up=upsample(dfn_vali)
+dfn_up=Cate_to_object_excp_inq(dfn_up)
+dfn_vali=Cate_to_object_excp_inq(dfn_vali)
+
+clfn,xn,yn=para_tune(dfn_up,dfn_vali_up)
+
+clfn.best_params_
+
+dfn_test1=Cate_to_object_excp_inq(dfn_test)
+dfn_test1=pd.get_dummies(dfn_test1)
+clfn.score(dfn_test1.drop('Default_ind',axis=1),dfn_test1['Default_ind'])
+
+from sklearn.neural_network import MLPClassifier
+mlpn = MLPClassifier(activation='relu',alpha=0.0001,hidden_layer_sizes=(100,),learning_rate='adaptive',
+                        solver='adam',max_iter=1000)
+mlpn.fit(xn,yn)
+mlpn.score(dfn_test1.drop('Default_ind',axis=1),dfn_test1['Default_ind'])
+
+y_predn=mlpn.predict(dfn_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(dfn_test1['Default_ind'],y_predn)
+
+
+
+# simple Gboost --KNN
+
+def boost(datatrain,datavali, nestimator=100, learningrate=1.0, maxdepth=1, randomstate=0):
+    '''
+    if not specified, the parameters are nestimator=100, criterion="gini", max_depth=8, min_samples_split=400, 
+    min_samples_leaf=50, bootstrap=True, oob_score=False, warm_start=False, max_samples=3000, random_state=0
+    '''
+    import numpy as np
+    from xgboost.sklearn import XGBClassifier
+    datatraindummy=pd.get_dummies(datatrain)
+    datatrainX=np.array(datatraindummy.drop('Default_ind', axis=1))
+    datatrainy=datatraindummy['Default_ind']
+    
+    XGB=XGBClassifier(n_estimators=nestimator, learning_rate=learningrate, max_depth=maxdepth, random_state=randomstate)
+    
+    '''RFclass = RandomForestClassifier(n_estimators=nestimator, criterion=criter,
+                                     max_depth=mdepth, min_samples_split=misamples_split, 
+                                     min_samples_leaf=misamples_leaf, bootstrap=bootstra,
+                                     oob_score=oobscore, warm_start=warmstart,
+                                     max_samples=maxsamples, random_state=randomstate)
+    ''' 
+    modelRF=XGB.fit(datatrainX,datatrainy)
+    
+    return(modelRF,datatrainX,datatrainy)
+
+clf6,x6,y6=boost(df1_up,df1_vali_up)
+
+clf6.fit(x6,y6)
+
+clf6.scores(x6,y6)
+
+df6_test1=Cate_to_object_excp_inq(df1_test)
+df6_test1=pd.get_dummies(df6_test1)
+clf6.score(df6_test1.drop('Default_ind',axis=1),df6_test1['Default_ind'])
+
+y_pred6=clf6.predict(df6_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(df6_test1['Default_ind'],y_pred6)
+
+def best_xgboost(datatrain, datavali, criteria='accuracy', randomstate=0):
+    '''
+    if not specified, the parameters are n_estimators=100, criterion="gini", max_depth=8, min_samples_split=400, 
+    min_samples_leaf=50, bootstrap=True, oob_score=False, warm_start=False, max_samples=3000, random_state=0
+    '''
+    from sklearn.model_selection import PredefinedSplit
+    import numpy as np
+    from xgboost.sklearn import XGBClassifier
+    frames=pd.concat([datatrain, datavali])
+    frames_reind=frames.set_index([pd.Index(range(len(frames)))])
+    split_index=[-1]*len(datatrain)+[0]*len(datavali)
+    pds = PredefinedSplit(test_fold = split_index)
+    datadummy=pd.get_dummies(frames_reind)
+    datatrainX=np.array(datadummy.drop('Default_ind', axis=1))
+    datatrainy=datadummy['Default_ind']
+    
+    XGB=XGBClassifier()
+    from sklearn.model_selection import GridSearchCV
+    parameter_space = {
+        'loss':['deviance', 'exponential'],
+        'n_estimators': [100,300],
+        'subsample': [0.5, 1],
+        'criterion':['friedman_mse', 'mse'], 
+        'max_depth':range(3,10,2),
+    }
+    modelGS=GridSearchCV(XGB, parameter_space,cv=pds,scoring=criteria)
+    modelGS.fit(datatrainX, datatrainy)
+    return modelGS,datatrainX,datatrainy
+
+def best_xgboost(datatrain, datavali, criteria='accuracy', randomstate=0):
+    '''
+    if not specified, the parameters are n_estimators=100, criterion="gini", max_depth=8, min_samples_split=400, 
+    min_samples_leaf=50, bootstrap=True, oob_score=False, warm_start=False, max_samples=3000, random_state=0
+    '''
+    from sklearn.model_selection import PredefinedSplit
+    import numpy as np
+    from sklearn.ensemble import GradientBoostingClassifier
+    frames=pd.concat([datatrain, datavali])
+    frames_reind=frames.set_index([pd.Index(range(len(frames)))])
+    split_index=[-1]*len(datatrain)+[0]*len(datavali)
+    pds = PredefinedSplit(test_fold = split_index)
+    datadummy=pd.get_dummies(frames_reind)
+    datatrainX=np.array(datadummy.drop('Default_ind', axis=1))
+    datatrainy=datadummy['Default_ind']
+    
+    XGB=GradientBoostingClassifier()
+    from sklearn.model_selection import GridSearchCV
+    parameter_space = {
+        'loss':['deviance', 'exponential'],
+    }
+    modelGS=GridSearchCV(XGB, parameter_space,cv=pds,scoring=criteria)
+    modelGS.fit(datatrainX, datatrainy)
+    return modelGS,datatrainX,datatrainy
+
+clf7,x7,y7=best_xgboost(df1_up,df1_vali_up)
+
+def best_xgboost(datatrain, datavali, criteria='accuracy', randomstate=0):
+    '''
+    if not specified, the parameters are n_estimators=100, criterion="gini", max_depth=8, min_samples_split=400, 
+    min_samples_leaf=50, bootstrap=True, oob_score=False, warm_start=False, max_samples=3000, random_state=0
+    '''
+    from sklearn.model_selection import PredefinedSplit
+    import numpy as np
+    from sklearn.ensemble import GradientBoostingClassifier
+    frames=pd.concat([datatrain, datavali])
+    frames_reind=frames.set_index([pd.Index(range(len(frames)))])
+    split_index=[-1]*len(datatrain)+[0]*len(datavali)
+    pds = PredefinedSplit(test_fold = split_index)
+    datadummy=pd.get_dummies(frames_reind)
+    datatrainX=np.array(datadummy.drop('Default_ind', axis=1))
+    datatrainy=datadummy['Default_ind']
+    
+    XGB=GradientBoostingClassifier(loss='exponential')
+    from sklearn.model_selection import GridSearchCV
+    parameter_space = {
+        'n_estimators': [100,300]
+        
+    }
+    modelGS=GridSearchCV(XGB,parameter_space,cv=pds,scoring=criteria)
+    modelGS.fit(datatrainX, datatrainy)
+    return modelGS,datatrainX,datatrainy
+
+
+clf7,x7,y7=best_xgboost(df1_up,df1_vali_up)
+
+clf7.best_params_
+
+def best_xgboost(datatrain, datavali, criteria='accuracy', randomstate=0):
+    '''
+    if not specified, the parameters are n_estimators=100, criterion="gini", max_depth=8, min_samples_split=400, 
+    min_samples_leaf=50, bootstrap=True, oob_score=False, warm_start=False, max_samples=3000, random_state=0
+    '''
+    from sklearn.model_selection import PredefinedSplit
+    import numpy as np
+    from sklearn.ensemble import GradientBoostingClassifier
+    frames=pd.concat([datatrain, datavali])
+    frames_reind=frames.set_index([pd.Index(range(len(frames)))])
+    split_index=[-1]*len(datatrain)+[0]*len(datavali)
+    pds = PredefinedSplit(test_fold = split_index)
+    datadummy=pd.get_dummies(frames_reind)
+    datatrainX=np.array(datadummy.drop('Default_ind', axis=1))
+    datatrainy=datadummy['Default_ind']
+    
+    XGB=GradientBoostingClassifier(loss='exponential')
+    from sklearn.model_selection import GridSearchCV
+    parameter_space = {
+        'n_estimators': range(50,100,10),
+    }
+    modelGS=GridSearchCV(XGB, parameter_space,cv=pds,scoring=criteria)
+    modelGS.fit(datatrainX, datatrainy)
+    return modelGS,datatrainX,datatrainy
+
+clf7,x7,y7=best_xgboost(df1_up,df1_vali_up)
+
+clf7.best_params_
+
+def best_xgboost(datatrain, datavali, criteria='accuracy', randomstate=0):
+    '''
+    if not specified, the parameters are n_estimators=100, criterion="gini", max_depth=8, min_samples_split=400, 
+    min_samples_leaf=50, bootstrap=True, oob_score=False, warm_start=False, max_samples=3000, random_state=0
+    '''
+    from sklearn.model_selection import PredefinedSplit
+    import numpy as np
+    from sklearn.ensemble import GradientBoostingClassifier
+    frames=pd.concat([datatrain, datavali])
+    frames_reind=frames.set_index([pd.Index(range(len(frames)))])
+    split_index=[-1]*len(datatrain)+[0]*len(datavali)
+    pds = PredefinedSplit(test_fold = split_index)
+    datadummy=pd.get_dummies(frames_reind)
+    datatrainX=np.array(datadummy.drop('Default_ind', axis=1))
+    datatrainy=datadummy['Default_ind']
+    
+    XGB=GradientBoostingClassifier(loss='exponential',n_estimators=90)
+    from sklearn.model_selection import GridSearchCV
+    parameter_space = {
+        'subsample':[0.5,1]
+    }
+    modelGS=GridSearchCV(XGB, parameter_space,cv=pds,scoring=criteria)
+    modelGS.fit(datatrainX, datatrainy)
+    return modelGS,datatrainX,datatrainy
+
+clf7,x7,y7=best_xgboost(df1_up,df1_vali_up)
+
+clf7.best_params_
+
+def best_xgboost(datatrain, datavali, criteria='accuracy', randomstate=0):
+    '''
+    if not specified, the parameters are n_estimators=100, criterion="gini", max_depth=8, min_samples_split=400, 
+    min_samples_leaf=50, bootstrap=True, oob_score=False, warm_start=False, max_samples=3000, random_state=0
+    '''
+    from sklearn.model_selection import PredefinedSplit
+    import numpy as np
+    from sklearn.ensemble import GradientBoostingClassifier
+    frames=pd.concat([datatrain, datavali])
+    frames_reind=frames.set_index([pd.Index(range(len(frames)))])
+    split_index=[-1]*len(datatrain)+[0]*len(datavali)
+    pds = PredefinedSplit(test_fold = split_index)
+    datadummy=pd.get_dummies(frames_reind)
+    datatrainX=np.array(datadummy.drop('Default_ind', axis=1))
+    datatrainy=datadummy['Default_ind']
+    
+    XGB=GradientBoostingClassifier(loss='exponential',n_estimators=90,subsample=1)
+    from sklearn.model_selection import GridSearchCV
+    parameter_space = {
+        'criterion':['friedman_mse', 'mse']
+    }
+    modelGS=GridSearchCV(XGB, parameter_space,cv=pds,scoring=criteria)
+    modelGS.fit(datatrainX, datatrainy)
+    return modelGS,datatrainX,datatrainy
+
+clf7,x7,y7=best_xgboost(df1_up,df1_vali_up)
+
+clf7.best_params_
+
+def best_xgboost(datatrain, datavali, criteria='accuracy', randomstate=0):
+    '''
+    if not specified, the parameters are n_estimators=100, criterion="gini", max_depth=8, min_samples_split=400, 
+    min_samples_leaf=50, bootstrap=True, oob_score=False, warm_start=False, max_samples=3000, random_state=0
+    '''
+    from sklearn.model_selection import PredefinedSplit
+    import numpy as np
+    from sklearn.ensemble import GradientBoostingClassifier
+    frames=pd.concat([datatrain, datavali])
+    frames_reind=frames.set_index([pd.Index(range(len(frames)))])
+    split_index=[-1]*len(datatrain)+[0]*len(datavali)
+    pds = PredefinedSplit(test_fold = split_index)
+    datadummy=pd.get_dummies(frames_reind)
+    datatrainX=np.array(datadummy.drop('Default_ind', axis=1))
+    datatrainy=datadummy['Default_ind']
+    
+    XGB=GradientBoostingClassifier(loss='exponential',n_estimators=90,subsample=1,criterion='friedman_mse')
+    from sklearn.model_selection import GridSearchCV
+    parameter_space = {'max_depth':range(1,7,2)
+        
+    }
+    modelGS=GridSearchCV(XGB, parameter_space,cv=pds,scoring=criteria)
+    modelGS.fit(datatrainX, datatrainy)
+    return modelGS,datatrainX,datatrainy
+
+clf7,x7,y7=best_xgboost(df1_up,df1_vali_up)
+
+clf7.best_params_
+
+def best_xgboost(datatrain, datavali, criteria='accuracy', randomstate=0):
+    '''
+    if not specified, the parameters are n_estimators=100, criterion="gini", max_depth=8, min_samples_split=400, 
+    min_samples_leaf=50, bootstrap=True, oob_score=False, warm_start=False, max_samples=3000, random_state=0
+    '''
+    from sklearn.model_selection import PredefinedSplit
+    import numpy as np
+    from sklearn.ensemble import GradientBoostingClassifier
+    frames=pd.concat([datatrain, datavali])
+    frames_reind=frames.set_index([pd.Index(range(len(frames)))])
+    split_index=[-1]*len(datatrain)+[0]*len(datavali)
+    pds = PredefinedSplit(test_fold = split_index)
+    datadummy=pd.get_dummies(frames_reind)
+    datatrainX=np.array(datadummy.drop('Default_ind', axis=1))
+    datatrainy=datadummy['Default_ind']
+    
+    XGB=GradientBoostingClassifier(loss='exponential',subsample=1,criterion='friedman_mse')
+    from sklearn.model_selection import GridSearchCV
+    parameter_space = {'max_depth':range(1,7,2),
+                        'n_estimators':range(80,100,5)
+    }
+    modelGS=GridSearchCV(XGB, parameter_space,cv=pds,scoring=criteria)
+    modelGS.fit(datatrainX, datatrainy)
+    return modelGS,datatrainX,datatrainy
+
+clf7,x7,y7=best_xgboost(df1_up,df1_vali_up)
+
+from sklearn.ensemble import GradientBoostingClassifier
+xg1 = GradientBoostingClassifier(loss='exponential',subsample=1,criterion='friedman_mse',max_depth=3,n_estimators=90)
+xg1.fit(x7,y7)
+xg1.score(df7_test1.drop('Default_ind',axis=1),df7_test1['Default_ind'])
+
+clf7.best_params_
+
+df7_test1=Cate_to_object_excp_inq(df1_test)
+df7_test1=pd.get_dummies(df7_test1)
+
+y_pred7=xg1.predict(df7_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(df7_test1['Default_ind'],y_pred7)
+
+# simple Gboost --drop
+
+def best_xgboost(datatrain, datavali, criteria='accuracy', randomstate=0):
+    '''
+    if not specified, the parameters are n_estimators=100, criterion="gini", max_depth=8, min_samples_split=400, 
+    min_samples_leaf=50, bootstrap=True, oob_score=False, warm_start=False, max_samples=3000, random_state=0
+    '''
+    from sklearn.model_selection import PredefinedSplit
+    import numpy as np
+    from sklearn.ensemble import GradientBoostingClassifier
+    frames=pd.concat([datatrain, datavali])
+    frames_reind=frames.set_index([pd.Index(range(len(frames)))])
+    split_index=[-1]*len(datatrain)+[0]*len(datavali)
+    pds = PredefinedSplit(test_fold = split_index)
+    datadummy=pd.get_dummies(frames_reind)
+    datatrainX=np.array(datadummy.drop('Default_ind', axis=1))
+    datatrainy=datadummy['Default_ind']
+    
+    XGB=GradientBoostingClassifier(loss='exponential',subsample=1,criterion='friedman_mse')
+    from sklearn.model_selection import GridSearchCV
+    parameter_space = {'max_depth':range(1,7,2),
+                        'n_estimators':range(80,100,5)
+    }
+    modelGS=GridSearchCV(XGB, parameter_space,cv=pds,scoring=criteria)
+    modelGS.fit(datatrainX, datatrainy)
+    return modelGS,datatrainX,datatrainy
+
+clf8,x8,y8=best_xgboost(df3_up,df3_vali_up)
+
+clf8.best_params_
+
+from sklearn.ensemble import GradientBoostingClassifier
+xg2 = GradientBoostingClassifier(loss='exponential',subsample=1,criterion='friedman_mse',max_depth=5,n_estimators=95)
+xg2.fit(x8,y8)
+xg2.score(df3_test1.drop('Default_ind',axis=1),df3_test1['Default_ind'])
+
+y_pred8=xg2.predict(df3_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(df3_test1['Default_ind'],y_pred8)
+
+# simple GBoost -CART
+
+clf9,x9,y9=best_xgboost(df5_up,df5_vali_up)
+
+clf9.best_params_
+
+from sklearn.ensemble import GradientBoostingClassifier
+clf9_up=GradientBoostingClassifier(max_depth=3,n_estimators=95)
+
+clf9_up.fit(x9,y9)
+
+
+clf9_up.score(df5_test1.drop('Default_ind',axis=1),df5_test1['Default_ind'])
+
+y_pred9=clf9_up.predict(df5_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(df5_test1['Default_ind'],y_pred9)
+
+# simple GBoost -RF
+
+clf10,x10,y10=best_xgboost(df6_up,df6_vali_up)
+
+clf10.best_params_
+
+from sklearn.ensemble import GradientBoostingClassifier
+clf10_up=GradientBoostingClassifier(max_depth=3,n_estimators=95)
+
+clf10_up.fit(x10,y10)
+
+clf10_up.score(df6_test1.drop('Default_ind',axis=1),df6_test1['Default_ind'])
+
+y_pred10=clf10_up.predict(df6_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(df6_test1['Default_ind'],y_pred10)
+
+# simple GBoost --EMB 
+
+clf11,x11,y11=best_xgboost(df7_up,df7_vali_up)
+
+clf11.fit(x11, y11)
+confusion_matrix(y11,clf11.predict(x11))
+
+clf11.best_params_
+
+from sklearn.ensemble import GradientBoostingClassifier
+xg4 = GradientBoostingClassifier(loss='exponential',subsample=1,criterion='friedman_mse',max_depth=3,n_estimators=90)
+xg4.fit(x11,y11)
+xg4.score(df7_test1.drop('Default_ind',axis=1),df7_test1['Default_ind'])
+
+y_pred11=xg4.predict(df7_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(df7_test1['Default_ind'],y_pred11)
+
+# simple GBoost -- Median
+
+clf12,x12,y12=best_xgboost(df2_up,df2_vali_up)
+
+clf11.fit(x11, y11)
+confusion_matrix(y12,clf12.predict(x12))
+
+clf12.best_params_
+
+from sklearn.ensemble import GradientBoostingClassifier
+xg5 = GradientBoostingClassifier(loss='exponential',subsample=1,criterion='friedman_mse',max_depth=3,n_estimators=80)
+xg5.fit(x11,y11)
+xg5.score(df2_test1.drop('Default_ind',axis=1),df2_test1['Default_ind'])
+
+y_pred12=xg5.predict(df2_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(df2_test1['Default_ind'],y_pred12)
+
+# simple GBoost -- mean
+
+clf13,x13,y13=best_xgboost(dfn_up,dfn_vali_up)
+
+clf13.best_params_
+
+
+from sklearn.ensemble import GradientBoostingClassifier
+clf13_up=GradientBoostingClassifier(max_depth=1,n_estimators=95)
+
+clf13_up.fit(x13,y13)
+
+clf13_up.score(dfn_test1.drop('Default_ind',axis=1),dfn_test1['Default_ind'])
+
+y_pred13=clf13_up.predict(dfn_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(dfn_test1['Default_ind'],y_pred13)
+
+# simple GBoost -- EM
+
+clf14,x14,y14=best_xgboost(df4_up,df4_vali_up)
+
+clf14.best_params_
+
+from sklearn.ensemble import GradientBoostingClassifier
+clf14_up=GradientBoostingClassifier(loss='exponential',subsample=1,criterion='friedman_mse',max_depth=5,n_estimators=95)
+
+clf14_up.fit(x14,y14)
+clf14_up.score(df4_test1.drop('Default_ind',axis=1),df4_test1['Default_ind'])
+
+y_pred14=clf14_up.predict(df4_test1.drop('Default_ind',axis=1))
+from sklearn.metrics import confusion_matrix
+confusion_matrix(df4_test1['Default_ind'],y_pred14)
+
