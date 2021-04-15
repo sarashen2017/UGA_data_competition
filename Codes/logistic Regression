@@ -1,0 +1,263 @@
+library("readr")
+library("tibble")
+library(remotes)
+library(plyr)
+library(groupdata2)
+library(caret)
+setwd("/Users/BB10190915/Desktop/Data_Comp/TrainData")
+data_files <- list.files(pattern = ".csv")
+print(data_files)
+list_of_data_set <- NULL
+# Read in data 
+for(i in 1:8){
+  list_of_data_set[[i]] <- read.table(data_files[i],sep = ",",header=T)
+}
+
+# If factorization is needed
+# for(i in 1:8){
+#   list_of_data_set[[i]]$non_mtg_acc_past_due_12_months_num <- factor(list_of_data_set[[i]]$non_mtg_acc_past_due_12_months_num)
+#   list_of_data_set[[i]]$non_mtg_acc_past_due_6_months_num <- factor(list_of_data_set[[i]]$non_mtg_acc_past_due_6_months_num)
+#   list_of_data_set[[i]]$mortgages_past_due_6_months_num <- factor(list_of_data_set[[i]]$mortgages_past_due_6_months_num)
+#   list_of_data_set[[i]]$card_open_36_month_num <- factor(list_of_data_set[[i]]$card_open_36_month_num )
+#   list_of_data_set[[i]]$auto_open_36_month_num <- factor(list_of_data_set[[i]]$auto_open_36_month_num)
+#   list_of_data_set[[i]]$ind_acc_XYZ <- factor(list_of_data_set[[i]]$ind_acc_XYZ)
+#   list_of_data_set[[i]]$Default_ind <- factor(list_of_data_set[[i]]$Default_ind)
+#   
+#   # inq_12_month_num card_inq_24_month_num considered as continuous
+# }
+
+#for(i in 1:8){print(colnames(list_of_data_set[[i]]))}
+
+# data_files
+setwd("/Users/BB10190915/Desktop/Data_Comp/TestData")
+data_filesT <- list.files(pattern = ".csv")
+print(data_filesT)
+list_of_data_setT <- NULL
+for(i in 1:8){
+  list_of_data_setT[[i]] <- read.table(data_filesT[i],sep = ",",header=T)
+}
+######  EMB_impute Logistic
+# P-val
+EM_lr <- glm(Default_ind~.,data=list_of_data_set[[1]],family="binomial")
+summary(EM_lr)
+EM_lr2 <- update(EM_lr, . ~ . -States) # Remove States in both senarios
+summary(EM_lr2)
+EM_lr3 <- update(EM_lr2, . ~ . -card_inq_24_month_num) 
+summary(EM_lr3)
+EM_lr4 <- update(EM_lr3, . ~ . -uti_card_50plus_pct) 
+summary(EM_lr4)
+EM_lr5 <- update(EM_lr4, . ~ . -uti_max_credit_line) 
+summary(EM_lr5)
+EM_lr6 <- update(EM_lr5, . ~ . -credit_good_age) 
+summary(EM_lr6)
+EM_lr7 <- update(EM_lr6, . ~ . -auto_open_36_month_num) 
+summary(EM_lr7)
+EM_lr8 <- update(EM_lr7, . ~ . -rep_income) 
+summary(EM_lr8)
+EM_lr9 <- update(EM_lr8, . ~ . -uti_50plus_pct) 
+summary(EM_lr9)
+EM_lr10 <- update(EM_lr9, . ~ . -card_age) 
+summary(EM_lr10)
+EM_lr11 <- update(EM_lr10, . ~ . -credit_past_due_amount) 
+summary(EM_lr11)
+
+
+# glm(formula = Default_ind ~ tot_credit_debt + avg_card_debt + 
+#       credit_age + non_mtg_acc_past_due_12_months_num + non_mtg_acc_past_due_6_months_num + 
+#       mortgages_past_due_6_months_num + inq_12_month_num + card_open_36_month_num + 
+#       uti_card + ind_acc_XYZ, family = "binomial", data = list_of_data_set[[1]])
+
+######  EM_impute Logistic
+# Test 
+EM_prob <- EM_lr11 %>% predict(list_of_data_setT[[1]], type = "response")
+EM_pred <- ifelse(EM_prob > 0.5, 1, 0)
+tab1 <- table(EM_pred,list_of_data_setT[[1]]$Default_ind)
+(tab1[1,1]+tab1[2,2]) /5000
+sum(EM_pred == 1)/sum(list_of_data_setT[[1]]$Default_ind==1)
+tab3[2,1]/(tab3[2,1]+tab3[2,2]) 
+tab3[1,2]/(tab3[1,1]+tab3[1,2]) 
+
+## Do upsampling 
+list_of_data_setup <- NULL
+list_of_data_setup[[3]] <- upsample(list_of_data_set[[3]],"Default_ind")
+dim(list_of_data_setup[[3]])
+
+KNN_lr <- glm(Default_ind~.,data=list_of_data_set[[3]],family="binomial")
+summary(KNN_lr)
+KNN_lr2 <- update(KNN_lr, . ~ . -States) # Remove States in both senarios
+summary(KNN_lr2)
+
+KNN_lr3 <- update(KNN_lr2, . ~ . -card_inq_24_month_num) 
+summary(KNN_lr3)
+KNN_lr4 <- update(KNN_lr3, . ~ . -uti_max_credit_line) 
+summary(KNN_lr4)
+KNN_lr5 <- update(KNN_lr4, . ~ . -credit_good_age) 
+summary(KNN_lr5)
+KNN_lr6 <- update(KNN_lr5, . ~ . -auto_open_36_month_num) 
+summary(KNN_lr6)
+KNN_lr7 <- update(KNN_lr6, . ~ . -uti_50plus_pct ) 
+summary(KNN_lr7)
+KNN_lr8 <- update(KNN_lr7, . ~ . -uti_card_50plus_pct) 
+summary(KNN_lr8)
+
+
+######  KNN_impute Logistic
+# Test 
+KNN_prob <- KNN_lr8 %>% predict(list_of_data_setT[[3]], type = "response")
+KNN_pred <- ifelse(KNN_prob > 0.5, 1, 0)
+tab3 <- table(KNN_pred,list_of_data_setT[[3]]$Default_ind)
+(tab3[1,1]+tab3[2,2]) /5000
+sum(KNN_pred == 1)/sum(list_of_data_setT[[3]]$Default_ind==1)
+# 95%
+KNN_lr9 <- update(KNN_lr8, . ~ . -rep_income) 
+summary(KNN_lr9)
+KNN_lr10 <- update(KNN_lr9, . ~ . -credit_past_due_amount) 
+summary(KNN_lr10)
+KNN_lr11 <- update(KNN_lr10, . ~ . -card_age) 
+summary(KNN_lr11)
+
+
+KNN_prob <- KNN_lr11 %>% predict(list_of_data_setT[[3]], type = "response")
+KNN_pred <- ifelse(KNN_prob > 0.5, 1, 0)
+tab3 <- table(KNN_pred,list_of_data_setT[[3]]$Default_ind)
+(tab3[1,1]+tab3[2,2]) /5000
+sum(KNN_pred == 1)/sum(list_of_data_setT[[3]]$Default_ind==1)
+tab3[2,1]/(tab3[2,1]+tab3[2,2]) 
+tab3[1,2]/(tab3[1,1]+tab3[1,2]) 
+# Best subset
+list_of_data_set[[3]]$Default_ind <- factor(list_of_data_set[[3]]$Default_ind)
+KNN_sub <- list_of_data_set[[3]][,c("tot_credit_debt" , "avg_card_debt" ,
+                                    "credit_age",  "non_mtg_acc_past_due_12_months_num", "non_mtg_acc_past_due_6_months_num", 
+                                    "mortgages_past_due_6_months_num",  "inq_12_month_num",  "card_open_36_month_num", 
+                                    "uti_card",  "ind_acc_XYZ","Default_ind")]
+KNN_bestsub <-bestglm(Xy = KNN_sub ,
+                      family = binomial,          # binomial family for logistic
+                      IC = "AIC",                 # Information criteria for
+                      method = "backward")
+
+summary(KNN_bestsub$BestModel)
+
+KNN_sub_prob <- KNN_bestsub$BestModel %>% predict(list_of_data_setT[[3]], type = "response")
+KNN_sub_pred <- ifelse(as.numeric(KNN_sub_prob )> 0.5, 1, 0)
+tab3 <- table(KNN_sub_pred,list_of_data_setT[[3]]$Default_ind)
+(tab3[1,1]+tab3[2,2]) /5000
+sum(KNN_sub_pred == 1)/sum(list_of_data_setT[[3]]$Default_ind==1)
+tab3[2,1]/(tab3[2,1]+tab3[2,2]) 
+tab3[1,2]/(tab3[1,1]+tab3[1,2]) 
+###################### Listwise deletion ###############
+list_of_data_setup[[4]] <- upsample(list_of_data_set[[4]],"Default_ind")
+dim(list_of_data_setup[[4]])
+
+Drop_lr <- glm(Default_ind~.,data=list_of_data_set[[4]],family="binomial")
+summary(Drop_lr)
+Drop_lr2 <- update(Drop_lr, . ~ . -States) # Remove States in both senarios
+summary(Drop_lr2)
+
+
+Drop_lr3 <- update(Drop_lr2, . ~ . -card_inq_24_month_num) 
+summary(Drop_lr3)
+Drop_lr4 <- update(Drop_lr3, . ~ . -uti_max_credit_line) 
+summary(Drop_lr4)
+Drop_lr5 <- update(Drop_lr4, . ~ . -credit_good_age) 
+summary(Drop_lr5)
+Drop_lr6 <- update(Drop_lr5, . ~ . -auto_open_36_month_num) 
+summary(Drop_lr6)
+Drop_lr7 <- update(Drop_lr6, . ~ . -uti_50plus_pct ) 
+summary(Drop_lr7)
+
+# 95% significance level
+Drop_lr8 <- update(Drop_lr7, . ~ . -rep_income) 
+summary(Drop_lr8)
+Drop_lr9 <- update(Drop_lr8, . ~ . -uti_card_50plus_pct) 
+summary(Drop_lr9)
+Drop_lr10 <- update(Drop_lr9, . ~ . -credit_past_due_amount ) 
+summary(Drop_lr10)
+Drop_lr11 <- update(Drop_lr10, . ~ . -card_age) 
+summary(Drop_lr11)
+
+Drop_prob <- Drop_lr11 %>% predict(list_of_data_setT[[3]], type = "response")
+Drop_pred <- ifelse(as.numeric(Drop_prob )> 0.5, 1, 0)
+tab3 <- table(Drop_pred,list_of_data_setT[[3]]$Default_ind)
+(tab3[1,1]+tab3[2,2]) /5000
+sum(Drop_pred == 1)/sum(list_of_data_setT[[3]]$Default_ind==1)
+tab3[2,1]/(tab3[2,1]+tab3[2,2]) 
+tab3[1,2]/(tab3[1,1]+tab3[1,2]) 
+# glm(formula = Default_ind ~ tot_credit_debt + avg_card_debt + 
+#       credit_age + non_mtg_acc_past_due_12_months_num + non_mtg_acc_past_due_6_months_num + 
+#       mortgages_past_due_6_months_num + inq_12_month_num + card_open_36_month_num + 
+#       uti_card + ind_acc_XYZ, family = "binomial", data = list_of_data_set[[4]])
+
+#
+#
+list_of_data_setup[[2]] <- upsample(list_of_data_set[[2]],"Default_ind")
+dim(list_of_data_setup[[2]])
+library(robustHD)
+list_of_data_setup[[2]]$tot_credit_debt <-  standardize(list_of_data_setup[[2]]$tot_credit_debt)
+list_of_data_setup[[2]]$avg_card_debt <-  standardize(list_of_data_setup[[2]]$avg_card_debt)
+list_of_data_setup[[2]]$credit_age <-  standardize(list_of_data_setup[[2]]$credit_age)
+list_of_data_setup[[2]]$credit_good_age <-  standardize(list_of_data_setup[[2]]$credit_good_age)
+list_of_data_setup[[2]]$card_age <-  standardize(list_of_data_setup[[2]]$card_age)
+list_of_data_setup[[2]]$credit_past_due_amount <-  standardize(list_of_data_setup[[2]]$credit_past_due_amount)
+list_of_data_setup[[2]]$rep_income <-  standardize(list_of_data_setup[[2]]$rep_income)
+
+EMB_lr <- glm(Default_ind~.,data=list_of_data_set[[2]],family="binomial")
+summary(EMB_lr)
+EMB_lr2 <- update(EMB_lr, . ~ . -States) # Remove States in both senarios
+summary(EMB_lr2)
+
+
+EMB_lr3 <- update(EMB_lr2, . ~ . -card_inq_24_month_num) 
+summary(EMB_lr3)
+EMB_lr4 <- update(EMB_lr3, . ~ . -uti_max_credit_line ) 
+summary(EMB_lr4)
+EMB_lr5 <- update(EMB_lr4, . ~ . -credit_good_age) 
+summary(EMB_lr5)
+EMB_lr6 <- update(EMB_lr5, . ~ . -auto_open_36_month_num) 
+summary(EMB_lr6)
+EMB_lr7 <- update(EMB_lr6, . ~ . -uti_50plus_pct ) 
+summary(EMB_lr7)
+
+
+EMB_lr8 <- update(EMB_lr7, . ~ . -rep_income) 
+summary(EMB_lr8)
+
+# 95% significance level
+EMB_lr9 <- update(EMB_lr8, . ~ . -uti_card_50plus_pct) 
+summary(EMB_lr9)
+EMB_lr10 <- update(EMB_lr9, . ~ . -card_age) 
+summary(EMB_lr10)
+EMB_lr11 <- update(EMB_lr10, . ~ . -credit_past_due_amount) 
+summary(EMB_lr11)
+
+EMB_prob <- EMB_lr11 %>% predict(list_of_data_setT[[2]], type = "response")
+EMB_pred <- ifelse(as.numeric(EMB_prob )> 0.5, 1, 0)
+tab3 <- table(EMB_pred,list_of_data_setT[[2]]$Default_ind)
+(tab3[1,1]+tab3[2,2]) /5000
+sum(Drop_pred == 1)/sum(v$Default_ind==1)
+tab3[2,1]/(tab3[2,1]+tab3[1,1]) 
+tab3[1,2]/(tab3[2,2]+tab3[1,2]) 
+
+# ROC curve
+library(ROSE)
+roc.curve(list_of_data_setT[[2]]$Default_ind,EMB_pred )
+
+library(pROC)
+plot(roc(list_of_data_setT[[2]]$Default_ind, EMB_pred, direction="<"),
+     col="yellow", lwd=3, main="The turtle finds its way")
+
+library(ROCR)
+x   <- prediction(EMB_pred, list_of_data_setT[[2]]$Default_ind)
+ROC <- performance(x, "tpr", "fpr")
+plot(ROC, col = as.list(1:2))
+
+# glm(formula = Default_ind ~ tot_credit_debt + avg_card_debt + 
+#       credit_age + non_mtg_acc_past_due_12_months_num + non_mtg_acc_past_due_6_months_num + 
+#       mortgages_past_due_6_months_num + inq_12_month_num + card_open_36_month_num + 
+#       uti_card + ind_acc_XYZ, family = "binomial", data = list_of_data_set[[4]])
+
+Drop_prob <- Drop_lr11 %>% predict(list_of_data_setT[[]], type = "response")
+KNN_pred <- ifelse(KNN_prob > 0.5, 1, 0)
+tab3 <- table(KNN_pred,list_of_data_setT[[2]]$Default_ind)
+(tab3[1,1]+tab3[2,2]) /5000
+sum(KNN_pred == 1)/sum(list_of_data_setT[[2]]$Default_ind==1)
+
